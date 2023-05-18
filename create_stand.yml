@@ -42,7 +42,7 @@
     - name: Изменение размера виртуального диска
       shell: "qemu-img resize {{pool_dir}}/{{ vm_name }}.qcow2 5G"
 
-    - name: Первичная настройка шаблона.
+    - name: Первичная настройка образа
       command: |
         virt-customize -a {{pool_dir}}/{{ vm_name }}.qcow2 \
         --root-password password:{{ default_root_pas }} \
@@ -74,7 +74,7 @@
         state: present
       register: line_result
       
-    - name: Ожидание загрузку стенда
+    - name: Ожидаем загрузку стенда
       wait_for:
         host: "{{ vm_name }}"
         port: 22
