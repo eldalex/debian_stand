@@ -20,9 +20,13 @@ remove_stand.yml:
     ipaddr: ip адрес
 
 Создание стенда:
-ansible-playbook -K ./create_stand.yml
-Создаст ВМ по указанным параметрам, закинет в неё ваш публичный ключ, добавит запись в etc/hosts и known_hosts текущего пользователя
+    
+    ansible-playbook -K ./create_stand.yml
+
+    Создаст ВМ по указанным параметрам, закинет в неё ваш публичный ключ, добавит запись в etc/hosts и known_hosts текущего пользователя
 
 Удаление стенда:
-ansible-playbook -K ./remove_stand.yml
-Удалит машину диск и все записи
+    
+    ansible-playbook -K ./remove_stand.yml
+
+    Удалит машину диск и все записи
