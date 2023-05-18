@@ -3,43 +3,38 @@
   gather_facts: yes
   become: yes
   vars:
-    pool_dir: "/home/alex/myStorage/storage_for_VMs/"
-    vm_net: default
-    ssh_pub_key: "/home/alex/.ssh/id_rsa.pub"
-    vm_name: debian_stand
-    default_root_pas: test123
-    vm_ram_mb: 2048
-    vm_vcpus: 2
+    pool_dir: "/home/alex/myStorage/storage_for_VMs"
+    vm_name: stand
     ipaddr: 192.168.122.100
   tasks:
     - name: Undefine виртуальной машины
       community.libvirt.virt:
         command: undefine
-        name: debian-stand
+        name: "{{ vm_name }}"
       register: vm_result
 
     - name: Destroy виртуальной машины
       community.libvirt.virt:
         command: destroy
-        name: debian-stand
+        name: "{{ vm_name }}"
       register: vm_result
 
     - name: Удаление диска виртуальной машины
       ansible.builtin.file:
-        path: /home/alex/myStorage/storage_for_VMs/debian_stand.qcow2
+        path: "{{pool_dir}}/{{ vm_name }}.qcow2"
         state: absent
     
-    - name: Проверка наличия строки в /etc/hosts
+    - name: Удаляем запись из /etc/hosts
       ansible.builtin.lineinfile:
         path: /etc/hosts
-        line: "192.168.122.100 debian-stand stand"
+        line: "{{ ipaddr }} {{ vm_name }}"
         state: absent
 
-    - name: Удаление стенда из known_hosts
+    - name: Удаляем запись из known_hosts
       become: false
       ansible.builtin.replace:
         path: ~/.ssh/known_hosts
-        regexp: "stand\\s.+\\sssh-(rsa)\\s.+\\n\\S.+\\n\\S.+"
+        regexp: "{{ vm_name }}\\s.+\\sssh-(rsa)\\s.+\\n\\S.+\\n\\S.+"
         replace: ""
 
     - name: Вывод результата
