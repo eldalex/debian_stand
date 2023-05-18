@@ -1,0 +1,94 @@
+---
+- name: Развертывание стенда debian 11
+  hosts: localhost
+  gather_facts: yes
+  become: yes
+  vars:
+    pool_dir: "/home/alex/myStorage/storage_for_VMs/"
+    vm_net: default
+    ssh_pub_key: "/home/alex/.ssh/id_rsa.pub"
+    vm_name: debian-stand
+    default_root_pas: test123
+    vm_ram_mb: 2048
+    vm_vcpus: 2
+    ipaddr: 192.168.122.100
+  tasks:
+    - name: Подготовка окружения
+      package:
+        name:
+          - libguestfs-tools
+          - python3-libvirt
+        state: present
+    
+    - name: Скачивание базового образа если его нет в хранилище
+      get_url:
+        url: https://cdimage.debian.org/cdimage/cloud/bullseye/20230124-1270/debian-11-generic-amd64-20230124-1270.qcow2
+        dest: /home/alex/myStorage/iso_images/debian-11-generic-amd64-20230124-1270.qcow2
+        checksum: sha256:8db9abe8e68349081cc1942a4961e12fb7f94f460ff170c4bdd590a9203fbf83
+        force: false
+
+    - name : Создание копии базового образа, для шаблона
+      copy:
+        dest: /home/alex/myStorage/storage_for_VMs/debian_stand.qcow2
+        src: /home/alex/myStorage/iso_images/debian-11-generic-amd64-20230124-1270.qcow2
+        force: false
+        mode: 0660
+      register: copy_results
+
+    - name: Изменение размера виртуального диска
+      shell: "qemu-img resize /home/alex/myStorage/storage_for_VMs/debian_stand.qcow2 5G"
+
+    - name: Первичная настройка шаблона.
+      command: |
+        virt-customize -a /home/alex/myStorage/storage_for_VMs/debian_stand.qcow2 \
+        --root-password password:{{ default_root_pas }} \
+        --ssh-inject 'root:file:{{ ssh_pub_key }}' \
+        --hostname {{ vm_name }} \
+        --run-command 'echo "source /etc/network/interfaces.d/*\nauto lo\niface lo inet loopback\nauto enp1s0\niface enp1s0 inet static\naddress {{ ipaddr }}\nnetmask 255.255.255.0\ngateway 192.168.122.1\ndns-nameservers 192.168.122.1" > /etc/network/interfaces'
+        --run-command 'ssh-keygen -A'
+        --uninstall cloud-init 
+      when: copy_results is changed
+
+    - name: Создание ВМ
+      community.libvirt.virt:
+        command: define
+        xml: "{{ lookup('template', 'vm-template.xml.j2') }}"
+
+    - name: Включение ВМ
+      community.libvirt.virt:
+        name: "{{ vm_name }}"
+        state: running
+      register: vm_start_results
+      until: "vm_start_results is success"
+      retries: 15
+      delay: 2
+
+    - name: Проверка наличия строки в /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "192.168.122.100 debian-stand stand"
+        state: present
+      register: line_result
+      
+    - name: Ожидание загрузку стенда
+      wait_for:
+        host: stand
+        port: 22
+        timeout: 300
+        state: started
+    
+    - name: Получение ключа хоста
+      ansible.builtin.shell: "ssh-keyscan -H stand"
+      register: keyscan_output
+      changed_when: false
+
+    - name: Добавление ключа в known_hosts
+      become: false
+      ansible.builtin.lineinfile:
+        path: ~/.ssh/known_hosts
+        line: "stand {{ keyscan_output.stdout }}"
+        state: present
+
+    - name: Завершение развёртывания стенда
+      debug: 
+        msg: Развертывание завершено.
